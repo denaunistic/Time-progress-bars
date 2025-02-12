@@ -91,6 +91,26 @@
       return new Date(Date.now() + atomicClockOffset);
     }
 
+    // Calculate laborable week progress (Monday to Friday)
+    function getLaborableWeekProgress(now) {
+      const dayOfWeek = now.getDay(); // 0 (Sunday) to 6 (Saturday)
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Saturday or Sunday
+
+      if (isWeekend) {
+        return 100; // Freeze at 100% during the weekend
+      }
+
+      // Calculate progress within the workweek (Monday to Friday)
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 5); // End of Friday
+
+      const totalWorkWeekDuration = endOfWeek - startOfWeek;
+      const elapsedWorkWeekDuration = now - startOfWeek;
+
+      return (elapsedWorkWeekDuration / totalWorkWeekDuration) * 100;
+    }
+
     function updateProgress() {
       const now = getAtomicTime();
 
@@ -136,6 +156,9 @@
       const endOfDecade = new Date(Math.floor(now.getFullYear() / 10) * 10 + 10, 0, 1);
       const decadeProgress = ((now - startOfDecade) / (endOfDecade - startOfDecade)) * 100;
 
+      // Laborable week progress
+      const laborableWeekProgress = getLaborableWeekProgress(now);
+
       // Update the DOM
       document.getElementById('minute-progress').innerText = `${minuteProgress.toFixed(2)}%`;
       document.getElementById('15-minute-progress').innerText = `${fifteenMinuteProgress.toFixed(2)}%`;
@@ -146,6 +169,7 @@
       document.getElementById('quarter-progress').innerText = `${quarterProgress.toFixed(2)}%`;
       document.getElementById('year-progress').innerText = `${yearProgress.toFixed(2)}%`;
       document.getElementById('decade-progress').innerText = `${decadeProgress.toFixed(2)}%`;
+      document.getElementById('laborable-week-progress').innerText = `${laborableWeekProgress.toFixed(2)}%`;
 
       // Update progress bars
       document.getElementById('minute-bar').style.width = `${minuteProgress}%`;
@@ -157,6 +181,7 @@
       document.getElementById('quarter-bar').style.width = `${quarterProgress}%`;
       document.getElementById('year-bar').style.width = `${yearProgress}%`;
       document.getElementById('decade-bar').style.width = `${decadeProgress}%`;
+      document.getElementById('laborable-week-bar').style.width = `${laborableWeekProgress}%`;
     }
 
     // Initialize atomic clock offset and start updating progress
@@ -198,6 +223,12 @@
       <span class="percentage" id="week-progress">0%</span>
     </div>
     <div class="progress-bar"><div class="progress-bar-fill" id="week-bar"></div></div>
+
+    <div class="time-category">
+      <span>Laborable Week</span>
+      <span class="percentage" id="laborable-week-progress">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-bar-fill" id="laborable-week-bar"></div></div>
 
     <div class="time-category">
       <span>Day</span>
