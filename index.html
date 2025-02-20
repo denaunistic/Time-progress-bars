@@ -69,9 +69,40 @@
       font-size: 1.3em;
       color: #00ff88;
     }
+    .location-input {
+      margin-bottom: 20px;
+    }
+    .location-input input {
+      padding: 8px;
+      font-size: 1em;
+      border-radius: 5px;
+      border: 1px solid #444;
+      background-color: #2a2a40;
+      color: #fff;
+    }
+    .location-input button {
+      padding: 8px 16px;
+      font-size: 1em;
+      border-radius: 5px;
+      border: none;
+      background-color: #00ff88;
+      color: #1e1e2f;
+      cursor: pointer;
+    }
+    .location-input button:hover {
+      background-color: #00cc66;
+    }
   </style>
   <script>
     let atomicClockOffset = 0; // Difference between local time and atomic clock time in milliseconds
+    let sunriseTime = new Date();
+    let sunsetTime = new Date();
+    let civilTwilightBegin = new Date();
+    let civilTwilightEnd = new Date();
+    let nauticalTwilightBegin = new Date();
+    let nauticalTwilightEnd = new Date();
+    let astronomicalTwilightBegin = new Date();
+    let astronomicalTwilightEnd = new Date();
 
     // Fetch atomic clock time from WorldTimeAPI
     async function fetchAtomicClockTime() {
@@ -89,6 +120,28 @@
     // Get the current time adjusted for atomic clock accuracy
     function getAtomicTime() {
       return new Date(Date.now() + atomicClockOffset);
+    }
+
+    // Fetch sunrise, sunset, and twilight times from Sunrise-Sunset API
+    async function fetchSunriseSunset(lat, lng) {
+      try {
+        const response = await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&formatted=0`);
+        const data = await response.json();
+        if (data.status === "OK") {
+          sunriseTime = new Date(data.results.sunrise);
+          sunsetTime = new Date(data.results.sunset);
+          civilTwilightBegin = new Date(data.results.civil_twilight_begin);
+          civilTwilightEnd = new Date(data.results.civil_twilight_end);
+          nauticalTwilightBegin = new Date(data.results.nautical_twilight_begin);
+          nauticalTwilightEnd = new Date(data.results.nautical_twilight_end);
+          astronomicalTwilightBegin = new Date(data.results.astronomical_twilight_begin);
+          astronomicalTwilightEnd = new Date(data.results.astronomical_twilight_end);
+        } else {
+          console.error('Error fetching sunrise-sunset data:', data.status);
+        }
+      } catch (error) {
+        console.error('Error fetching sunrise-sunset data:', error);
+      }
     }
 
     // Calculate laborable week progress (Monday to Friday)
@@ -109,6 +162,63 @@
       const elapsedWorkWeekDuration = now - startOfWeek;
 
       return (elapsedWorkWeekDuration / totalWorkWeekDuration) * 100;
+    }
+
+    // Calculate daytime, twilight, and nighttime progress
+    function getDayNightTwilightProgress(now) {
+      const currentTime = now.getTime();
+
+      // Daytime
+      if (currentTime >= sunriseTime.getTime() && currentTime < sunsetTime.getTime()) {
+        return {
+          phase: "Daytime",
+          progress: ((currentTime - sunriseTime.getTime()) / (sunsetTime.getTime() - sunriseTime.getTime())) * 100
+        };
+      }
+
+      // Twilight phases
+      if (currentTime >= civilTwilightBegin.getTime() && currentTime < sunriseTime.getTime()) {
+        return {
+          phase: "Morning Civil Twilight",
+          progress: ((currentTime - civilTwilightBegin.getTime()) / (sunriseTime.getTime() - civilTwilightBegin.getTime())) * 100
+        };
+      }
+      if (currentTime >= sunsetTime.getTime() && currentTime < civilTwilightEnd.getTime()) {
+        return {
+          phase: "Evening Civil Twilight",
+          progress: ((currentTime - sunsetTime.getTime()) / (civilTwilightEnd.getTime() - sunsetTime.getTime())) * 100
+        };
+      }
+      if (currentTime >= nauticalTwilightBegin.getTime() && currentTime < civilTwilightBegin.getTime()) {
+        return {
+          phase: "Morning Nautical Twilight",
+          progress: ((currentTime - nauticalTwilightBegin.getTime()) / (civilTwilightBegin.getTime() - nauticalTwilightBegin.getTime())) * 100
+        };
+      }
+      if (currentTime >= civilTwilightEnd.getTime() && currentTime < nauticalTwilightEnd.getTime()) {
+        return {
+          phase: "Evening Nautical Twilight",
+          progress: ((currentTime - civilTwilightEnd.getTime()) / (nauticalTwilightEnd.getTime() - civilTwilightEnd.getTime())) * 100
+        };
+      }
+      if (currentTime >= astronomicalTwilightBegin.getTime() && currentTime < nauticalTwilightBegin.getTime()) {
+        return {
+          phase: "Morning Astronomical Twilight",
+          progress: ((currentTime - astronomicalTwilightBegin.getTime()) / (nauticalTwilightBegin.getTime() - astronomicalTwilightBegin.getTime())) * 100
+        };
+      }
+      if (currentTime >= nauticalTwilightEnd.getTime() && currentTime < astronomicalTwilightEnd.getTime()) {
+        return {
+          phase: "Evening Astronomical Twilight",
+          progress: ((currentTime - nauticalTwilightEnd.getTime()) / (astronomicalTwilightEnd.getTime() - nauticalTwilightEnd.getTime())) * 100
+        };
+      }
+
+      // Nighttime
+      return {
+        phase: "Nighttime",
+        progress: 100
+      };
     }
 
     function updateProgress() {
@@ -159,6 +269,9 @@
       // Laborable week progress
       const laborableWeekProgress = getLaborableWeekProgress(now);
 
+      // Day, twilight, and night progress
+      const { phase, progress } = getDayNightTwilightProgress(now);
+
       // Update the DOM
       document.getElementById('minute-progress').innerText = `${minuteProgress.toFixed(2)}%`;
       document.getElementById('15-minute-progress').innerText = `${fifteenMinuteProgress.toFixed(2)}%`;
@@ -170,6 +283,8 @@
       document.getElementById('year-progress').innerText = `${yearProgress.toFixed(2)}%`;
       document.getElementById('decade-progress').innerText = `${decadeProgress.toFixed(2)}%`;
       document.getElementById('laborable-week-progress').innerText = `${laborableWeekProgress.toFixed(2)}%`;
+      document.getElementById('twilight-phase').innerText = phase;
+      document.getElementById('twilight-progress').innerText = `${progress.toFixed(2)}%`;
 
       // Update progress bars
       document.getElementById('minute-bar').style.width = `${minuteProgress}%`;
@@ -182,6 +297,7 @@
       document.getElementById('year-bar').style.width = `${yearProgress}%`;
       document.getElementById('decade-bar').style.width = `${decadeProgress}%`;
       document.getElementById('laborable-week-bar').style.width = `${laborableWeekProgress}%`;
+      document.getElementById('twilight-bar').style.width = `${progress}%`;
     }
 
     // Initialize atomic clock offset and start updating progress
@@ -189,10 +305,43 @@
       setInterval(updateProgress, 10); // Update every millisecond for smooth progress
       updateProgress(); // Initial call
     });
+
+    // Handle location input
+    document.getElementById('location-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const lat = document.getElementById('latitude').value;
+      const lng = document.getElementById('longitude').value;
+      fetchSunriseSunset(lat, lng);
+    });
+
+    // Use current location
+    document.getElementById('use-current-location').addEventListener('click', () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          document.getElementById('latitude').value = lat;
+          document.getElementById('longitude').value = lng;
+          fetchSunriseSunset(lat, lng);
+        }, (error) => {
+          console.error('Error getting current location:', error);
+        });
+      } else {
+        console.error('Geolocation is not supported by this browser.');
+      }
+    });
   </script>
 </head>
 <body>
   <h1>Time Progress Tracker</h1>
+  <div class="location-input">
+    <form id="location-form">
+      <input type="text" id="latitude" placeholder="Latitude" required>
+      <input type="text" id="longitude" placeholder="Longitude" required>
+      <button type="submit">Set Location</button>
+    </form>
+    <button id="use-current-location">Use Current Location</button>
+  </div>
   <div class="progress-container">
     <div class="time-category">
       <span>Decade</span>
@@ -253,6 +402,13 @@
       <span class="percentage" id="minute-progress">0%</span>
     </div>
     <div class="progress-bar"><div class="progress-bar-fill" id="minute-bar"></div></div>
+
+    <!-- Twilight Phase Progress Bar -->
+    <div class="time-category">
+      <span id="twilight-phase">Twilight Phase</span>
+      <span class="percentage" id="twilight-progress">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-bar-fill" id="twilight-bar"></div></div>
   </div>
 </body>
 </html>
