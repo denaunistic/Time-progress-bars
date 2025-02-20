@@ -136,6 +136,14 @@
           nauticalTwilightEnd = new Date(data.results.nautical_twilight_end);
           astronomicalTwilightBegin = new Date(data.results.astronomical_twilight_begin);
           astronomicalTwilightEnd = new Date(data.results.astronomical_twilight_end);
+          console.log("Sunrise:", sunriseTime);
+          console.log("Sunset:", sunsetTime);
+          console.log("Civil Twilight Begin:", civilTwilightBegin);
+          console.log("Civil Twilight End:", civilTwilightEnd);
+          console.log("Nautical Twilight Begin:", nauticalTwilightBegin);
+          console.log("Nautical Twilight End:", nauticalTwilightEnd);
+          console.log("Astronomical Twilight Begin:", astronomicalTwilightBegin);
+          console.log("Astronomical Twilight End:", astronomicalTwilightEnd);
         } else {
           console.error('Error fetching sunrise-sunset data:', data.status);
         }
@@ -164,49 +172,55 @@
       return (elapsedWorkWeekDuration / totalWorkWeekDuration) * 100;
     }
 
-    // Calculate daytime, twilight, and nighttime progress
-    function getDayNightTwilightProgress(now) {
+    // Calculate daytime progress (sunrise to sunset)
+    function getDaylightProgress(now) {
+      const currentTime = now.getTime();
+      if (currentTime >= sunriseTime.getTime() && currentTime < sunsetTime.getTime()) {
+        return ((currentTime - sunriseTime.getTime()) / (sunsetTime.getTime() - sunriseTime.getTime())) * 100;
+      }
+      return 0; // Outside daylight hours
+    }
+
+    // Calculate twilight phase and progress
+    function getTwilightProgress(now) {
       const currentTime = now.getTime();
 
-      // Daytime
-      if (currentTime >= sunriseTime.getTime() && currentTime < sunsetTime.getTime()) {
-        return {
-          phase: "Daytime",
-          progress: ((currentTime - sunriseTime.getTime()) / (sunsetTime.getTime() - sunriseTime.getTime())) * 100
-        };
-      }
-
-      // Twilight phases
+      // Morning Civil Twilight
       if (currentTime >= civilTwilightBegin.getTime() && currentTime < sunriseTime.getTime()) {
         return {
           phase: "Morning Civil Twilight",
           progress: ((currentTime - civilTwilightBegin.getTime()) / (sunriseTime.getTime() - civilTwilightBegin.getTime())) * 100
         };
       }
+      // Evening Civil Twilight
       if (currentTime >= sunsetTime.getTime() && currentTime < civilTwilightEnd.getTime()) {
         return {
           phase: "Evening Civil Twilight",
           progress: ((currentTime - sunsetTime.getTime()) / (civilTwilightEnd.getTime() - sunsetTime.getTime())) * 100
         };
       }
+      // Morning Nautical Twilight
       if (currentTime >= nauticalTwilightBegin.getTime() && currentTime < civilTwilightBegin.getTime()) {
         return {
           phase: "Morning Nautical Twilight",
           progress: ((currentTime - nauticalTwilightBegin.getTime()) / (civilTwilightBegin.getTime() - nauticalTwilightBegin.getTime())) * 100
         };
       }
+      // Evening Nautical Twilight
       if (currentTime >= civilTwilightEnd.getTime() && currentTime < nauticalTwilightEnd.getTime()) {
         return {
           phase: "Evening Nautical Twilight",
           progress: ((currentTime - civilTwilightEnd.getTime()) / (nauticalTwilightEnd.getTime() - civilTwilightEnd.getTime())) * 100
         };
       }
+      // Morning Astronomical Twilight
       if (currentTime >= astronomicalTwilightBegin.getTime() && currentTime < nauticalTwilightBegin.getTime()) {
         return {
           phase: "Morning Astronomical Twilight",
           progress: ((currentTime - astronomicalTwilightBegin.getTime()) / (nauticalTwilightBegin.getTime() - astronomicalTwilightBegin.getTime())) * 100
         };
       }
+      // Evening Astronomical Twilight
       if (currentTime >= nauticalTwilightEnd.getTime() && currentTime < astronomicalTwilightEnd.getTime()) {
         return {
           phase: "Evening Astronomical Twilight",
@@ -269,8 +283,11 @@
       // Laborable week progress
       const laborableWeekProgress = getLaborableWeekProgress(now);
 
-      // Day, twilight, and night progress
-      const { phase, progress } = getDayNightTwilightProgress(now);
+      // Daylight progress
+      const daylightProgress = getDaylightProgress(now);
+
+      // Twilight progress
+      const { phase, progress } = getTwilightProgress(now);
 
       // Update the DOM
       document.getElementById('minute-progress').innerText = `${minuteProgress.toFixed(2)}%`;
@@ -283,6 +300,7 @@
       document.getElementById('year-progress').innerText = `${yearProgress.toFixed(2)}%`;
       document.getElementById('decade-progress').innerText = `${decadeProgress.toFixed(2)}%`;
       document.getElementById('laborable-week-progress').innerText = `${laborableWeekProgress.toFixed(2)}%`;
+      document.getElementById('daylight-progress').innerText = `${daylightProgress.toFixed(2)}%`;
       document.getElementById('twilight-phase').innerText = phase;
       document.getElementById('twilight-progress').innerText = `${progress.toFixed(2)}%`;
 
@@ -297,6 +315,7 @@
       document.getElementById('year-bar').style.width = `${yearProgress}%`;
       document.getElementById('decade-bar').style.width = `${decadeProgress}%`;
       document.getElementById('laborable-week-bar').style.width = `${laborableWeekProgress}%`;
+      document.getElementById('daylight-bar').style.width = `${daylightProgress}%`;
       document.getElementById('twilight-bar').style.width = `${progress}%`;
     }
 
@@ -311,7 +330,11 @@
       e.preventDefault();
       const lat = document.getElementById('latitude').value;
       const lng = document.getElementById('longitude').value;
-      fetchSunriseSunset(lat, lng);
+      if (lat && lng) {
+        fetchSunriseSunset(lat, lng);
+      } else {
+        alert("Please enter valid latitude and longitude.");
+      }
     });
 
     // Use current location
@@ -402,6 +425,13 @@
       <span class="percentage" id="minute-progress">0%</span>
     </div>
     <div class="progress-bar"><div class="progress-bar-fill" id="minute-bar"></div></div>
+
+    <!-- Daylight Progress Bar -->
+    <div class="time-category">
+      <span>Daylight</span>
+      <span class="percentage" id="daylight-progress">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-bar-fill" id="daylight-bar"></div></div>
 
     <!-- Twilight Phase Progress Bar -->
     <div class="time-category">
